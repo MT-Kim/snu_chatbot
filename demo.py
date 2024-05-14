@@ -164,7 +164,7 @@ def analyze_keyword(raw_text, callback, keyword):
     # prompt formatting
     rag_prompt = [
         SystemMessage(
-            content=f"다음 나올 문서에 '{keyword}'와 관련된 내용이 있는지 분석해줘. 한줄로 짧게."
+            content="다음 나올 문서에" + str(keyword)+"와 관련된 내용이 있는지 분석해줘."
         ),
         HumanMessage(
             content=raw_text
@@ -186,7 +186,7 @@ save_button = st.sidebar.button("Save Key")
 if save_button and len(api_key)>10:
     os.environ["OPENAI_API_KEY"] = api_key
     st.sidebar.success("API Key saved successfully!")
-    
+
 keyword = st.sidebar.text_input("Enter keyword to analyze", value="")
 
 # file upload
