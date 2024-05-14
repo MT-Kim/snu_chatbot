@@ -164,7 +164,7 @@ def analyze_keyword(raw_text, callback, keyword):
     # prompt formatting
     rag_prompt = [
         SystemMessage(
-            content=f"다음 나올 문서에 '{keyword}'와 관련된 내용이 있는지 분석해줘."
+            content=f"다음 나올 문서에 '{keyword}'와 관련된 내용이 있는지 분석해줘. 한줄로 짧게."
         ),
         HumanMessage(
             content=raw_text
