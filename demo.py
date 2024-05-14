@@ -164,7 +164,25 @@ def analyze_keyword(raw_text, callback, keyword):
     # prompt formatting
     rag_prompt = [
         SystemMessage(
-            content="다음 나올 문서에" + str(keyword)+"와 관련된 내용이 있는지 분석해줘. 한줄로 짧게 적어줘."
+            content="다음 나올 문서에" + str(keyword)+"와 관련된 내용이 있는지 분석해줘."
+        ),
+        HumanMessage(
+            content=raw_text
+        ),
+    ]
+
+    response = llm(rag_prompt)
+    return response.content
+
+
+def abstract_summary(raw_text, callback):
+    # generator
+    llm = ChatOpenAI(model_name="gpt-4-1106-preview", temperature=0, streaming=True, callbacks=[callback])
+
+    # prompt formatting
+    rag_prompt = [
+        SystemMessage(
+            content="다음 나올 문서에서 abstract 내용만 100자 이내로 요약해줘."
         ),
         HumanMessage(
             content=raw_text
@@ -212,7 +230,7 @@ for msg in st.session_state.messages:
     st.chat_message(msg.role).write(msg.content)
     
 # message interaction
-if prompt := st.chat_input("'요약' 또는 '키워드분석'이라고 입력해보세요!"):
+if prompt := st.chat_input("'abstract', '키워드분석', 또는 '요약'이라고 입력해보세요!"):
     st.session_state.messages.append(ChatMessage(role="user", content=prompt))
     st.chat_message("user").write(prompt)
 
@@ -224,12 +242,16 @@ if prompt := st.chat_input("'요약' 또는 '키워드분석'이라고 입력해
             st.session_state["messages"].append(
                 ChatMessage(role="assistant", content=response)
             )
-        if prompt == "키워드분석":
+        elif prompt == "키워드분석":
             response = analyze_keyword(st.session_state['raw_text'], stream_handler, keyword)
             st.session_state["messages"].append(
                 ChatMessage(role="assistant", content=response)
             )
-        
+        elif prompt == "abstract":
+            response = abstract_summary(st.session_state['raw_text'], stream_handler)
+            st.session_state["messages"].append(
+                ChatMessage(role="assistant", content=response)
+            )
         else:
             response = generate_response(prompt, st.session_state['vectorstore'], stream_handler)
             st.session_state["messages"].append(
