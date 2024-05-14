@@ -22,6 +22,7 @@ class StreamHandler(BaseCallbackHandler):
         self.text += token
         self.container.markdown(self.text)
 
+
 # function to extract text from an HWP file
 import olefile
 import zlib
@@ -91,27 +92,23 @@ def process_uploaded_file(uploaded_file):
     # Load document if file is uploaded
     if uploaded_file is not None:
         # loader
-        # pdf파일을 처리하려면?
         if uploaded_file.type == 'application/pdf':
             raw_text = get_pdf_text(uploaded_file)
-        # hwp파일을 처리하려면? (hwp loader(parser)는 난이도 매우 어려움)
-        elif uploaded_file.type == 'application/octet-stream':
-            raw_text = get_hwp_text(uploaded_file)
-
         # splitter
         text_splitter = CharacterTextSplitter(
-            separator = "\n\n",
-            chunk_size = 1000,
-            chunk_overlap  = 200,
-            length_function = len,
-            is_separator_regex = False,
+            separator="\n\n",
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len,
+            is_separator_regex=False,
         )
         all_splits = text_splitter.create_documents([raw_text])
+
         print("총 " + str(len(all_splits)) + "개의 passage")
         
         # storage
         vectorstore = FAISS.from_documents(documents=all_splits, embedding=OpenAIEmbeddings())
-
+                
         return vectorstore, raw_text
     return None
 
@@ -122,16 +119,15 @@ def generate_response(query_text, vectorstore, callback):
     docs_list = vectorstore.similarity_search(query_text, k=3)
     docs = ""
     for i, doc in enumerate(docs_list):
-        docs += f"'문서{i+1}':{doc.page_content}\n"
-    print(docs)
+        docs += f"'문서{i + 1}':{doc.page_content}\n"
         
     # generator
     llm = ChatOpenAI(model_name="gpt-4o", temperature=0, streaming=True, callbacks=[callback])
-    
+
     # chaining
     rag_prompt = [
         SystemMessage(
-            content="너는 문서에 대해 질의응답을 하는 '서울대'야. 주어진 문서를 참고하여 사용자의 질문에 답변을 해줘. 문서에 내용이 정확하게 나와있지 않으면 너의 지식 선에서 잘 얘기해줘. 답변은 이모티콘을 넣어서 귀엽고 깜찍하게 해줘! 답변을 잘하면 200달러 팁을 줄게"
+            content="너는 논문 문서에 대해 관련 정보를 찾아주는 '닥터페이퍼'야. 주어진 문서를 참고하여 사용자의 질문에 답변을 해줘. 문서에 내용이 정확하게 나와있지 않으면 대답하지 마."
         ),
         HumanMessage(
             content=f"질문:{query_text}\n\n{docs}"
@@ -144,9 +140,9 @@ def generate_response(query_text, vectorstore, callback):
 
 
 def generate_summarize(raw_text, callback):
-    # generator 
+    # generator
     llm = ChatOpenAI(model_name="gpt-4-1106-preview", temperature=0, streaming=True, callbacks=[callback])
-    
+
     # prompt formatting
     rag_prompt = [
         SystemMessage(
@@ -156,21 +152,42 @@ def generate_summarize(raw_text, callback):
             content=raw_text
         ),
     ]
-    
+
+    response = llm(rag_prompt)
+    return response.content
+
+
+def analyze_keyword(raw_text, callback, keyword):
+    # generator
+    llm = ChatOpenAI(model_name="gpt-4-1106-preview", temperature=0, streaming=True, callbacks=[callback])
+
+    # prompt formatting
+    rag_prompt = [
+        SystemMessage(
+            content=f"다음 나올 문서에 '{keyword}'와 관련된 내용이 있는지 분석해줘."
+        ),
+        HumanMessage(
+            content=raw_text
+        ),
+    ]
+
     response = llm(rag_prompt)
     return response.content
 
 
 # page title
-st.set_page_config(page_title='🦜🔗 SNU 문서 기반 요약 및 QA 챗봇')
-st.title('🦜🔗 SNU 문서 기반 요약 및 QA 챗봇')
+st.set_page_config(page_title='🦜🔗 논문 분석 챗봇')
+st.title('🦜🔗 논문 분석 및 QA 챗봇')
 
+# enter token
 import os
 api_key = st.sidebar.text_input("Enter your OpenAI API Key", type="password")
 save_button = st.sidebar.button("Save Key")
 if save_button and len(api_key)>10:
     os.environ["OPENAI_API_KEY"] = api_key
     st.sidebar.success("API Key saved successfully!")
+    
+keyword = st.sidebar.text_input("Enter keyword to analyze", value="")
 
 # file upload
 uploaded_file = st.file_uploader('Upload an document', type=['hwp','pdf'])
@@ -186,7 +203,7 @@ if uploaded_file:
 if "messages" not in st.session_state:
     st.session_state["messages"] = [
         ChatMessage(
-            role="assistant", content="하이 :)  저는 서울대학교 문서에 대한 이해를 도와주는 챗봇입니다. 어떤게 궁금하신가요?"
+            role="assistant", content="안녕하세요! 저는 논문에 관련 keyword가 있는지 찾아주고, 이에 대한 이해를 도와주는 챗봇입니다. 어떤게 궁금하신가요?"
         )
     ]
 
@@ -195,7 +212,7 @@ for msg in st.session_state.messages:
     st.chat_message(msg.role).write(msg.content)
     
 # message interaction
-if prompt := st.chat_input("'요약'이라고 입력해보세요!"):
+if prompt := st.chat_input("'요약' 또는 '키워드분석'이라고 입력해보세요!"):
     st.session_state.messages.append(ChatMessage(role="user", content=prompt))
     st.chat_message("user").write(prompt)
 
@@ -203,7 +220,12 @@ if prompt := st.chat_input("'요약'이라고 입력해보세요!"):
         stream_handler = StreamHandler(st.empty())
         
         if prompt == "요약":
-            response = generate_summarize(st.session_state['raw_text'],stream_handler)
+            response = generate_summarize(st.session_state['raw_text'], stream_handler)
+            st.session_state["messages"].append(
+                ChatMessage(role="assistant", content=response)
+            )
+        if prompt == "키워드분석":
+            response = analyze_keyword(st.session_state['raw_text'], stream_handler, keyword)
             st.session_state["messages"].append(
                 ChatMessage(role="assistant", content=response)
             )
