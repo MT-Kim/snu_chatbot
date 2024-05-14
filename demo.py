@@ -164,7 +164,7 @@ def analyze_keyword(raw_text, callback, keyword):
     # prompt formatting
     rag_prompt = [
         SystemMessage(
-            content="다음 나올 문서에" + str(keyword)+"와 관련된 내용이 있는지 분석해줘."
+            content="다음 나올 문서에" + str(keyword)+"와 관련된 내용이 있는지 분석해줘. 한줄로 작성해줘."
         ),
         HumanMessage(
             content=raw_text
@@ -182,7 +182,7 @@ def abstract_summary(raw_text, callback):
     # prompt formatting
     rag_prompt = [
         SystemMessage(
-            content="다음 나올 문서에서 abstract 내용만 100자 이내로 요약해줘."
+            content="다음 나올 문서에서 abstract 내용만 100자 이내로 요약해줘. 'Notion style'로 작성해줘."
         ),
         HumanMessage(
             content=raw_text
